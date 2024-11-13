@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <!-- <link rel="stylesheet" href="ChatGPT_files/root-dcq62fgs.css"> -->
+    <style>
+        body {
+    font-family: Arial, sans-serif;
+    background-color: #181818;
+    color: #ffffff;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    line-height: 1.75;
+}
+
+.chat-container {
+    width: 95%;
+    max-width: 70%;
+    height: 90vh;
+    /* background-color: #1e1e1e; */
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    /* box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); */
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    /* background-color: #2b2b2b; */
+    /* border-bottom: 1px solid #3a3a3a; */
+}
+
+.header-title {
+    font-size: 18px;
+}
+
+.header-profile .profile-image {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.message {
+    max-width: 80%;
+    /* padding: 12px; */
+    border-radius: 1.5rem;
+    font-size: 14px;
+    color: hsla(0,0%,100%,.8);
+}
+
+.user-message {
+    max-width: 55% !important;
+    align-self: flex-end;
+    background-color: hsla(0,0%,100%,.3);
+    color: #ffffff;
+    border-top-right-radius: .5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    /* padding-bottom: .625rem;
+    padding-top: .625rem; */
+}
+
+.assistant-response {
+    align-self: flex-start;
+    background-color: transparent;
+    border-top-left-radius: .5rem;
+    font-feature-settings: normal;
+    font-family: ui-sans-serif,-apple-system,system-ui,Segoe UI,Helvetica,Apple Color Emoji,Arial,sans-serif,Segoe UI Emoji,Segoe UI Symbol;
+    font-variation-settings: normal;
+    font-size: 15px;
+    font-weight: 530;
+}
+
+.chat-input-container {
+    display: flex;
+    padding: 10px;
+    background-color: #2b2b2b;
+    /* border-top: 1px solid #3a3a3a; */
+    border-radius: 26px;
+    width: 80%;
+    margin: auto;
+}
+
+.chat-input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: transparent; /* #1e1e1e; */
+    color: #ffffff;
+    font-size: 15px;
+}
+
+.send-button {
+    margin-left: 10px;
+    padding: 10px 15px;
+    background-color: hsla(0,0%,100%,.3);
+    /* border: none; */
+    border-radius: 26px;
+    border-color: transparent;
+    color: #ffffff;
+    /* border-radius: 4px; */
+    cursor: pointer;
+}
+
+.panah {
+    margin-left: 10px;
+    background-color: transparent;
+    border-radius: 26px;
+    border-color: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 27px;
+}
+
+.welcome-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* font-size: 30px; */
+    color: #ffffff;
+    text-align: center;
+    padding: 20px;
+    /* background-color: rgba(0, 0, 0, 0.7); */
+    /* border-radius: 8px; */
+    max-width: 90%;
+    display: block; /* Ini akan diatur menjadi 'none' nanti di JS */
+    font-size: 1.875rem;
+    font-weight: 600;
+    line-height: 2.25rem;
+}
+
+
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="header-title">ChatGPT</div>
+            <div class="header-profile">
+                <img src="profile-placeholder.png" alt="Profile" class="profile-image">
+            </div>
+        </div>
+        <!-- Teks tengah yang tampil saat halaman baru dibuka -->
+        <div class="welcome-message" id="welcomeMessage">Mulai chat dengan mengirimkan pesan</div>
+        <div class="chat-messages"></div>
+        <div class="chat-input-container">
+            <button class="panah">></button>
+            <input type="text" placeholder="Message ChatGPT" class="chat-input">
+            <button class="send-button">Send</button>
+        </div>
+    </div>
+    
+    <script>
+
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+        // Referensi elemen-elemen yang dibutuhkan
+        const chatInput = document.querySelector('.chat-input');
+        const sendButton = document.querySelector('.send-button');
+        const chatMessages = document.querySelector('.chat-messages');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        let isFirstMessageSent = false; // Flag untuk melacak jika pesan pertama telah dikirim
+
+        socket.on('message', function(msg) {
+            const messageDiv = document.createElement('div');
+//            messageDiv.textContent = msg;
+//            messageDiv.classList.add('message');
+//            chat.appendChild(messageDiv);
+//            chat.scrollTop = chat.scrollHeight; 
+            addMessageToChat(msg, false);
+            console.log(msg);
+        });
+    
+        // Fungsi untuk membuat elemen pesan
+        function createMessageElement(content, isUserMessage = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(isUserMessage ? 'user-message' : 'assistant-response');
+            const messageParagraph = document.createElement('p');
+            messageParagraph.textContent = content;
+            messageDiv.appendChild(messageParagraph);
+            return messageDiv;
+        }
+    
+        // Fungsi untuk menambahkan pesan ke area chat
+        function addMessageToChat(content, isUserMessage = true) {
+            const messageElement = createMessageElement(content, isUserMessage);
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll ke bawah
+        }
+    
+        // Fungsi untuk menangani pengiriman pesan
+        function handleSendMessage() {
+            const userInput = chatInput.value.trim();
+            if (userInput) {
+                // Sembunyikan pesan selamat datang saat pesan pertama dikirim
+                if (!isFirstMessageSent) {
+                    welcomeMessage.style.display = 'none';
+                    isFirstMessageSent = true;
+                }
+                addMessageToChat(userInput, true); // Tambahkan pesan pengguna
+                socket.send(userInput);
+                chatInput.value = ''; // Kosongkan input
+               // setTimeout(() => {
+               //     generateAutoResponse(); // Balasan otomatis dari "ChatGPT"
+               // }, 1000); // Tunggu 1 detik sebelum balasan otomatis
+            }
+        }
+    
+        // Fungsi untuk membuat balasan otomatis
+/*        function generateAutoResponse() {
+            const responses = [
+                "Interesting question!",
+                "buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas",
+                "I'm here to help.",
+                "Can you clarify further?",
+                "Thank you for asking.",
+                "Let's explore that topic together.",
+                "I'm not sure about that. What do you think?",
+                "buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas buatkan saya kode html dan css untuk membuat tampilan seperti gambar di atas"
+            ];
+            const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+            addMessageToChat(randomResponse, false);
+        } */
+    
+        // Tambahkan event listener pada tombol kirim dan input
+        sendButton.addEventListener('click', handleSendMessage);
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                handleSendMessage();
+            }
+        });
+    </script>
+    
+    
+</body>
+</html>
